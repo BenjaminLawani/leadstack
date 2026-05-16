@@ -1,0 +1,2 @@
+## Leadstack
+dead simple CRM
