@@ -5,6 +5,7 @@ from fastapi.templating import Jinja2Templates
 
 load_dotenv()
 templates = Jinja2Templates("client")
+templates.env.cache = {}
 
 class Settings(BaseSettings):
     DATABASE_URL: str = os.environ["DATABASE_URL"]
