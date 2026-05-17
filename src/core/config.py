@@ -4,9 +4,7 @@ from pydantic_settings import BaseSettings
 from fastapi.templating import Jinja2Templates
 
 load_dotenv()
-templates = Jinja2Templates("client")
-templates.env.cache = {}
-
+templates = Jinja2Templates(directory="client")
 class Settings(BaseSettings):
     DATABASE_URL: str = os.environ["DATABASE_URL"]
     JWT_KEY: str = os.environ["JWT_KEY"]
