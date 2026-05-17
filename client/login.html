@@ -121,10 +121,10 @@
                 </p>
             </div>
 
-    <script src="auth-utils.js"></script>
+    <script src="/static/auth-utils.js"></script>
     <script>
         // Redirect if already authenticated
-        redirectIfAuthenticated();
+        //redirectIfAuthenticated();
         
         // Login form handler
         document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -164,7 +164,7 @@
                     storeAuthToken(data.access_token, data.token_type);
                     
                     // Redirect to dashboard
-                    window.location.href = '/dashboard.html';
+                    window.location.href = '/dashboard/';
                 } else {
                     // Show error message
                     errorMessage.textContent = data.detail || 'Login failed. Please try again.';

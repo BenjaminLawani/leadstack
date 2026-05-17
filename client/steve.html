@@ -407,18 +407,34 @@
         </main>
     </div>
 
-    <script src="auth-utils.js"></script>
+    <script src="/static/auth-utils.js"></script>
     <script>
         // Require authentication
-        //requireAuth();
+        requireAuth();
         
-        // Get user info from token
-        const token = getAuthToken();
-        if (token) {
-            document.getElementById('userEmailSidebar').textContent = 'Logged in';
-            document.getElementById('userName').textContent = 'User';
-            document.getElementById('userAvatar').textContent = 'U';
+        // Fetch and display user info from /me endpoint
+        async function loadUserInfo() {
+            try {
+                const response = await authenticatedFetch('/auth/me');
+                if (response.ok) {
+                    const user = await response.json();
+                    // Update UI with user info
+                    document.getElementById('userEmailSidebar').textContent = user.email;
+                    document.getElementById('userName').textContent = user.name || 'User';
+                    // Set avatar to first letter of name or email
+                    const avatarLetter = (user.name || user.email).charAt(0).toUpperCase();
+                    document.getElementById('userAvatar').textContent = avatarLetter;
+                }
+            } catch (error) {
+                console.error('Error loading user info:', error);
+                // If we can't load user info, redirect to login
+                clearAuthToken();
+                window.location.href = '/auth/login';
+            }
         }
+        
+        // Load user info on page load
+        loadUserInfo();
         
         // Logout handler
         document.getElementById('logoutButton').addEventListener('click', () => {
@@ -636,7 +652,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
+                        'Authorization': `${token.tokenType.charAt(0).toUpperCase() + token.tokenType.slice(1)} ${token.accessToken}`
                     },
                     body: JSON.stringify(requestBody)
                 });

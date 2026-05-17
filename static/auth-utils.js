@@ -49,8 +49,11 @@ function getAuthHeader() {
         return {};
     }
     
+    // Capitalize token type (e.g., "bearer" -> "Bearer")
+    const tokenType = token.tokenType.charAt(0).toUpperCase() + token.tokenType.slice(1);
+    
     return {
-        'Authorization': `${token.tokenType} ${token.accessToken}`
+        'Authorization': `${tokenType} ${token.accessToken}`
     };
 }
 
@@ -83,7 +86,7 @@ async function authenticatedFetch(url, options = {}) {
  */
 function redirectIfAuthenticated() {
     if (isAuthenticated()) {
-        window.location.href = '/dashboard.html';
+        window.location.href = '/dashboard/';
     }
 }
 

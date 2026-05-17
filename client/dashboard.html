@@ -280,7 +280,7 @@
                 <span class="nav-item-text">Pipeline</span>
             </a>
             
-            <a href="#steve" class="nav-item" data-page="steve">
+            <a href="/dashboard/steve" class="nav-item" data-page="steve">
                 <span class="nav-item-icon">
                     <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
@@ -551,23 +551,38 @@
         </div>
     </div>
 
-    <script src="auth-utils.js"></script>
+    <script src="/static/auth-utils.js"></script>
     <script>
         // Require authentication
-        //requireAuth();
+        requireAuth();
         
         // API Base URL
         const API_BASE_URL = window.location.origin;
         
-        // Get user info from token (you can decode JWT or fetch from API)
-        const token = getAuthToken();
-        if (token) {
-            // For now, just show that user is logged in
-            // In production, you'd decode the JWT or fetch user info from API
-            document.getElementById('userEmailSidebar').textContent = 'Logged in';
-            document.getElementById('userName').textContent = 'User';
-            document.getElementById('userAvatar').textContent = 'U';
+        // Fetch and display user info from /me endpoint
+        async function loadUserInfo() {
+            try {
+                const response = await authenticatedFetch('/auth/me');
+                
+                if (response.ok) {
+                    const user = await response.json();
+                    // Update UI with user info
+                    document.getElementById('userEmailSidebar').textContent = user.email;
+                    document.getElementById('userName').textContent = user.name || 'User';
+                    // Set avatar to first letter of name or email
+                    const avatarLetter = (user.name || user.email).charAt(0).toUpperCase();
+                    document.getElementById('userAvatar').textContent = avatarLetter;
+                }
+            } catch (error) {
+                console.error('Error loading user info:', error);
+                // If we can't load user info, redirect to login
+                clearAuthToken();
+                window.location.href = '/auth/login';
+            }
         }
+        
+        // Load user info on page load
+        loadUserInfo();
         
         // API Helper Functions
         async function apiRequest(endpoint, options = {}) {
@@ -578,7 +593,9 @@
             };
             
             if (token) {
-                headers['Authorization'] = `Bearer ${token}`;
+                // Capitalize token type (e.g., "bearer" -> "Bearer")
+                const tokenType = token.tokenType.charAt(0).toUpperCase() + token.tokenType.slice(1);
+                headers['Authorization'] = `${tokenType} ${token.accessToken}`;
             }
             
             const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -696,7 +713,7 @@
         }
         
         // Initialize dashboard on load
-        if (token) {
+        if (isAuthenticated()) {
             loadDashboardData();
         }
         
@@ -931,6 +948,13 @@
         
         navItems.forEach(item => {
             item.addEventListener('click', (e) => {
+                const page = item.getAttribute('data-page');
+                
+                // Allow Steve link to navigate to a new page
+                if (page === 'steve') {
+                    return; // Let the default navigation happen
+                }
+                
                 e.preventDefault();
                 
                 // Remove active class from all items
@@ -938,9 +962,6 @@
                 
                 // Add active class to clicked item
                 item.classList.add('active');
-                
-                // Show the corresponding page
-                const page = item.getAttribute('data-page');
                 
                 // Hide all pages
                 Object.values(pages).forEach(p => {

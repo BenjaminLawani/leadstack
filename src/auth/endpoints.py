@@ -10,7 +10,7 @@ from fastapi import (
     Path,
     Query,
 )
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_sso.sso.google import GoogleSSO
 
@@ -171,7 +171,7 @@ async def login_google_user(
                 <script>
                     localStorage.setItem('access_token', '{access_token}');
                     localStorage.setItem('token_type', 'bearer');
-                    window.location.href = '/dashboard.html';
+                    window.location.href = '/dashboard/';
                 </script>
             </body>
             </html>
