@@ -222,9 +222,121 @@
         .main-wrapper.sidebar-collapsed {
             margin-left: 64px;
         }
+        
+        /* Toast Notification Styles */
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            pointer-events: none;
+        }
+        
+        .toast {
+            pointer-events: auto;
+            min-width: 300px;
+            max-width: 500px;
+            padding: 1rem 1.25rem;
+            border-radius: 0.5rem;
+            background-color: rgba(18, 18, 18, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            animation: slideIn 0.3s ease-out;
+            backdrop-filter: blur(10px);
+        }
+        
+        .toast.removing {
+            animation: slideOut 0.3s ease-out forwards;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+        }
+        
+        .toast-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+        }
+        
+        .toast-content {
+            flex: 1;
+            font-size: 0.875rem;
+            color: #dedede;
+        }
+        
+        .toast-close {
+            flex-shrink: 0;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.4);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 0.25rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .toast-close:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .toast.success {
+            border-color: rgba(34, 197, 94, 0.3);
+        }
+        
+        .toast.success .toast-icon {
+            color: #22c55e;
+        }
+        
+        .toast.error {
+            border-color: rgba(239, 68, 68, 0.3);
+        }
+        
+        .toast.error .toast-icon {
+            color: #ef4444;
+        }
+        
+        .toast.info {
+            border-color: rgba(59, 130, 246, 0.3);
+        }
+        
+        .toast.info .toast-icon {
+            color: #3b82f6;
+        }
     </style>
 </head>
 <body class="antialiased min-h-screen">
+    
+    <!-- Toast Container -->
+    <div id="toastContainer" class="toast-container"></div>
     
     <!-- Sidebar Navigation -->
     <aside id="sidebar" class="sidebar expanded">
@@ -359,7 +471,7 @@
                         <p class="text-xs text-zinc-500">Manually add a lead to your pipeline</p>
                     </button>
                     
-                    <button class="bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] rounded-lg p-4 text-left transition-all">
+                    <button id="importLeadsBtn" class="bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] rounded-lg p-4 text-left transition-all">
                         <h3 class="text-sm font-medium text-white mb-1">Import Leads</h3>
                         <p class="text-xs text-zinc-500">Upload a CSV file with your leads</p>
                     </button>
@@ -495,17 +607,27 @@
                         <input type="text" name="company" class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
                     </div>
                     <div>
-                        <label class="block text-xs text-zinc-400 mb-1">Phone</label>
-                        <input type="tel" name="phone" class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
+                        <label class="block text-xs text-zinc-400 mb-1">Phone *</label>
+                        <input type="tel" name="phone_number" required class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
                     </div>
                     <div>
-                        <label class="block text-xs text-zinc-400 mb-1">Status</label>
-                        <select name="status" class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
-                            <option value="new">New</option>
-                            <option value="contacted">Contacted</option>
-                            <option value="qualified">Qualified</option>
-                            <option value="converted">Converted</option>
-                            <option value="lost">Lost</option>
+                        <label class="block text-xs text-zinc-400 mb-1">Lead Status *</label>
+                        <select name="lead_status" required class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
+                            <option value="HOT">Hot</option>
+                            <option value="WARM">Warm</option>
+                            <option value="COLD">Cold</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">Pipeline Status *</label>
+                        <select name="pipeline_status" required class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
+                            <option value="NEW">New</option>
+                            <option value="IN_PROGRESS">In Progress</option>
+                            <option value="CLOSED">Closed</option>
+                            <option value="WON">Won</option>
+                            <option value="LOST">Lost</option>
+                            <option value="ACTIVE">Active</option>
+                            <option value="INACTIVE">Inactive</option>
                         </select>
                     </div>
                     <div class="flex gap-3 pt-2">
@@ -517,6 +639,68 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+
+        <!-- CSV Upload Modal -->
+        <div id="csvUploadModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-[#010101] border border-white/[0.06] rounded-lg p-6 max-w-md w-full mx-4">
+                <h2 class="text-lg font-medium text-white mb-4">Import Leads from CSV</h2>
+                <div class="space-y-4">
+                    <div class="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-white mb-2">CSV Format</h3>
+                        <p class="text-xs text-zinc-400 mb-2">Your CSV file should have the following columns:</p>
+                        <code class="text-xs text-green-400 block bg-black/30 p-2 rounded">name,company,phone_number,email,lead_status,pipeline_status</code>
+                        <p class="text-xs text-zinc-400 mt-2">lead_status must be: HOT, WARM, or COLD</p>
+                        <p class="text-xs text-zinc-400 mt-1">pipeline_status must be: NEW, IN_PROGRESS, CLOSED, WON, LOST, ACTIVE, or INACTIVE</p>
+                    </div>
+                    
+                    <form id="csvUploadForm" class="space-y-4">
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-2">Select CSV File</label>
+                            <input type="file" id="csvFileInput" name="file" accept=".csv" required
+                                class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium file:bg-white file:text-black hover:file:bg-zinc-200 file:cursor-pointer">
+                        </div>
+                        
+                        <div id="uploadProgress" class="hidden">
+                            <div class="bg-white/[0.02] rounded-full h-2 overflow-hidden">
+                                <div id="uploadProgressBar" class="bg-green-500 h-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <p id="uploadStatus" class="text-xs text-zinc-400 mt-2"></p>
+                        </div>
+                        
+                        <div id="uploadResults" class="hidden space-y-2">
+                            <div class="bg-white/[0.02] border border-white/[0.06] rounded-lg p-3">
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-zinc-400">Total Rows:</span>
+                                    <span id="totalRows" class="text-white font-medium">0</span>
+                                </div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-zinc-400">Successful:</span>
+                                    <span id="successfulRows" class="text-green-400 font-medium">0</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-zinc-400">Failed:</span>
+                                    <span id="failedRows" class="text-red-400 font-medium">0</span>
+                                </div>
+                            </div>
+                            
+                            <div id="errorsList" class="hidden max-h-40 overflow-y-auto bg-white/[0.02] border border-red-500/20 rounded-lg p-3">
+                                <h4 class="text-xs font-medium text-red-400 mb-2">Errors:</h4>
+                                <div id="errorsContent" class="space-y-1"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex gap-3 pt-2">
+                            <button type="submit" id="uploadCsvBtn" class="flex-1 bg-white text-black px-4 py-2 rounded text-sm font-medium hover:bg-zinc-200 transition-colors">
+                                Upload CSV
+                            </button>
+                            <button type="button" id="cancelCsvUploadBtn" class="flex-1 bg-white/[0.02] border border-white/[0.06] text-white px-4 py-2 rounded text-sm font-medium hover:bg-white/[0.04] transition-colors">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
 
@@ -583,6 +767,41 @@
         
         // Load user info on page load
         loadUserInfo();
+        
+        // Toast Notification System
+        function showToast(message, type = 'info', duration = 4000) {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            // Icon based on type
+            let icon = '';
+            if (type === 'success') {
+                icon = '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+            } else if (type === 'error') {
+                icon = '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M15 9l-6 6M9 9l6 6"/></svg>';
+            } else {
+                icon = '<svg class="toast-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>';
+            }
+            
+            toast.innerHTML = `
+                ${icon}
+                <div class="toast-content">${message}</div>
+                <button class="toast-close" onclick="this.parentElement.remove()">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M18 6L6 18M6 6l12 12"/>
+                    </svg>
+                </button>
+            `;
+            
+            container.appendChild(toast);
+            
+            // Auto remove after duration
+            setTimeout(() => {
+                toast.classList.add('removing');
+                setTimeout(() => toast.remove(), 300);
+            }, duration);
+        }
         
         // API Helper Functions
         async function apiRequest(endpoint, options = {}) {
@@ -806,8 +1025,9 @@
                 name: formData.get('name'),
                 email: formData.get('email'),
                 company: formData.get('company') || null,
-                phone: formData.get('phone') || null,
-                status: formData.get('status') || 'new'
+                phone_number: formData.get('phone_number'),
+                lead_status: formData.get('lead_status'),
+                pipeline_status: formData.get('pipeline_status')
             };
             
             try {
@@ -815,9 +1035,114 @@
                 hideModal('addLeadModal');
                 e.target.reset();
                 await loadDashboardData();
-                alert('Lead added successfully!');
+                showToast('Lead added successfully!', 'success');
             } catch (error) {
-                alert(`Error adding lead: ${error.message}`);
+                showToast(`Error adding lead: ${error.message}`, 'error');
+            }
+        });
+        
+        // CSV Upload Functionality
+        document.getElementById('importLeadsBtn')?.addEventListener('click', () => {
+            showModal('csvUploadModal');
+            // Reset form and results
+            document.getElementById('csvUploadForm').reset();
+            document.getElementById('uploadProgress').classList.add('hidden');
+            document.getElementById('uploadResults').classList.add('hidden');
+            document.getElementById('errorsList').classList.add('hidden');
+        });
+        
+        document.getElementById('cancelCsvUploadBtn')?.addEventListener('click', () => {
+            hideModal('csvUploadModal');
+            document.getElementById('csvUploadForm').reset();
+            document.getElementById('uploadProgress').classList.add('hidden');
+            document.getElementById('uploadResults').classList.add('hidden');
+            document.getElementById('errorsList').classList.add('hidden');
+        });
+        
+        document.getElementById('csvUploadForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const fileInput = document.getElementById('csvFileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                showToast('Please select a CSV file', 'error');
+                return;
+            }
+            
+            // Show progress
+            const progressDiv = document.getElementById('uploadProgress');
+            const progressBar = document.getElementById('uploadProgressBar');
+            const statusText = document.getElementById('uploadStatus');
+            const uploadBtn = document.getElementById('uploadCsvBtn');
+            
+            progressDiv.classList.remove('hidden');
+            document.getElementById('uploadResults').classList.add('hidden');
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            
+            statusText.textContent = 'Uploading file...';
+            progressBar.style.width = '30%';
+            
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const token = localStorage.getItem('token');
+                const response = await fetch('/leads/upload-csv', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+                
+                progressBar.style.width = '70%';
+                statusText.textContent = 'Processing...';
+                
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.detail || 'Upload failed');
+                }
+                
+                const result = await response.json();
+                
+                progressBar.style.width = '100%';
+                statusText.textContent = 'Complete!';
+                
+                // Show results
+                document.getElementById('totalRows').textContent = result.total_rows;
+                document.getElementById('successfulRows').textContent = result.successful;
+                document.getElementById('failedRows').textContent = result.failed;
+                document.getElementById('uploadResults').classList.remove('hidden');
+                
+                // Show errors if any
+                if (result.errors && result.errors.length > 0) {
+                    const errorsList = document.getElementById('errorsList');
+                    const errorsContent = document.getElementById('errorsContent');
+                    
+                    errorsContent.innerHTML = result.errors.map(err =>
+                        `<div class="text-xs text-red-300">Row ${err.row}: ${err.error}</div>`
+                    ).join('');
+                    
+                    errorsList.classList.remove('hidden');
+                }
+                
+                // Reload dashboard data
+                if (result.successful > 0) {
+                    await loadDashboardData();
+                }
+                
+                // Reset button
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Another';
+                
+            } catch (error) {
+                console.error('CSV upload error:', error);
+                progressDiv.classList.add('hidden');
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload CSV';
+                showToast(`Error uploading CSV: ${error.message}`, 'error');
             }
         });
         
@@ -892,9 +1217,9 @@
                 e.target.reset();
                 const notes = await fetchNotesForLead(currentLeadId);
                 displayNotes(notes);
-                alert('Note added successfully!');
+                showToast('Note added successfully!', 'success');
             } catch (error) {
-                alert(`Error adding note: ${error.message}`);
+                showToast(`Error adding note: ${error.message}`, 'error');
             }
         });
         
@@ -1181,10 +1506,10 @@
                 saveBtn.textContent = 'Save Changes';
                 saveBtn.disabled = false;
                 
-                alert('Pipeline changes saved successfully!');
+                showToast('Pipeline changes saved successfully!', 'success');
             } catch (error) {
                 console.error('Error saving pipeline changes:', error);
-                alert(`Error saving changes: ${error.message}`);
+                showToast(`Error saving changes: ${error.message}`, 'error');
                 saveBtn.textContent = 'Save Changes';
                 saveBtn.disabled = false;
             }

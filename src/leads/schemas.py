@@ -8,6 +8,7 @@ from pydantic import (
     BaseModel,
     UUID4,
     Field,
+    EmailStr,
 )
 
 from src.core.enums import (
@@ -18,10 +19,11 @@ from src.core.enums import (
 class LeadCreate(BaseModel):
     name: str
     company: Optional[str] = None
-    phone_number: str = Field(max_length=16)
+    phone_number: str
     email: Optional[str] = None
-    lead_status: LeadStatus
 
+    lead_status: LeadStatus
+    pipeline_status: PipelineStatus
     class Config:
         from_attributes = True
         from_orm = True
@@ -59,4 +61,13 @@ class LeadListResponse(BaseModel):
 
     class Config:
         from_orm = True
+        from_attributes = True
+
+class CSVUploadResponse(BaseModel):
+    total_rows: int
+    successful: int
+    failed: int
+    errors: List[dict]
+
+    class Config:
         from_attributes = True

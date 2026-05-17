@@ -1,0 +1,5 @@
+name,company,phone_number,email,lead_status
+John Doe,Acme Corp,+1234567890,john@acme.com,HOT
+Jane Smith,Tech Solutions,+1987654321,jane@techsolutions.com,WARM
+Bob Johnson,StartupXYZ,+1122334455,bob@startupxyz.com,COLD
+Alice Williams,Global Inc,+1555666777,alice@globalinc.com,HOT
