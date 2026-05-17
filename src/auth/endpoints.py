@@ -186,11 +186,11 @@ async def login_google_user(
 
 @auth_router.get("/login")
 async def login(request: Request):
-    return templates.TemplateResponse("login.html", {"request": request})
+    return templates.TemplateResponse("login.html", context={"request": request})
 
 @auth_router.get("/get-started")
 async def get_started(request: Request):
-    return templates.TemplateResponse("get-started.html", {"request": request})
+    return templates.TemplateResponse("get-started.html", context={"request": request})
 
 @auth_router.get("/me", response_model=UserResponse)
 def me(
