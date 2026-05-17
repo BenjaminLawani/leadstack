@@ -3,7 +3,6 @@ from typing import (
     List,
     Optional,
 )
-from numba import u4
 from pydantic import (
     BaseModel,
     UUID4,
