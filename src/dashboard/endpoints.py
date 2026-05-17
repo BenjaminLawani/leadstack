@@ -16,10 +16,10 @@ dashboard_router = APIRouter(
 def get_dashboard(
     request: Request
 ):
-    return templates.TemplateResponse("dashboard.html", context={"request": request})
+    return templates.TemplateResponse(request=request, name="dashboard.html")
 
 @dashboard_router.get("/steve")
 def get_steve(
     request: Request,
 ):
-    return templates.TemplateResponse("steve.html", context={"request": request})
+    return templates.TemplateResponse(request=request, name="steve.html")

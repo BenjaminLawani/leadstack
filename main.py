@@ -38,7 +38,7 @@ async def startup_event():
 
 @app.get("/")
 def home(request: Request):
-    return templates.TemplateResponse("index.html", context={"request": request})
+    return templates.TemplateResponse(request=request, name="index.html")
 
 app.include_router(auth_router)
 app.include_router(ai_router)
