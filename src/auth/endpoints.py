@@ -10,7 +10,7 @@ from fastapi import (
     Path,
     Query,
 )
-
+from fastapi.responses import HTMLResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi_sso.sso.google import GoogleSSO
 
@@ -61,7 +61,7 @@ def create_email_user(
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            
+            detail="An account with this email already exists"
         )
     try:
         new_user = User(**user.model_dump(exclude={"first_name", "last_name"}))
@@ -157,17 +157,30 @@ async def login_google_user(
                 {
                     "sub": str(db_user.id),
                     "email": db_user.email,
-                }   
+                }
             )
             
-            return Token(
-                access_token=access_token,
-                token_type="bearer"
-            )
+            # Return HTML page that stores token and redirects
+            html_content = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Redirecting...</title>
+            </head>
+            <body>
+                <script>
+                    localStorage.setItem('access_token', '{access_token}');
+                    localStorage.setItem('token_type', 'bearer');
+                    window.location.href = '/dashboard.html';
+                </script>
+            </body>
+            </html>
+            """
+            return HTMLResponse(content=html_content)
 
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An internal server error occurred: {e}"
         )
 
@@ -178,3 +191,10 @@ async def login(request: Request):
 @auth_router.get("/get-started")
 async def get_started(request: Request):
     return templates.TemplateResponse("get-started.html", {"request": request})
+
+@auth_router.get("/me", response_model=UserResponse)
+def me(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+):
+    return UserResponse.model_validate(current_user)

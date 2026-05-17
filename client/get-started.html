@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Leadstack — Initialize Account</title>
+    <title>Leadstack — Create Account</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -25,7 +25,7 @@
     <div class="hidden lg:flex lg:w-1/2 h-full bg-[#010101] border-r border-white/[0.04] relative p-12 flex-col justify-between items-start linear-grid">
         <div class="absolute inset-0 ambient-glow pointer-events-none"></div>
         
-        <a href="#" class="flex items-center gap-3 tracking-tight z-10">
+        <a href="/" class="flex items-center gap-3 tracking-tight z-10">
             <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="9" stroke-opacity="0.2"/>
                 <path d="M12 3v18" stroke-opacity="0.8"/>
@@ -48,7 +48,6 @@
         <div class="text-[10px] text-zinc-600 font-light z-10 flex gap-4">
             <span>&copy; 2026 Leadstack Labs</span>
             <span>•</span>
-            <span>SSL Environment Secured</span>
         </div>
     </div>
 
@@ -57,12 +56,12 @@
         <div class="max-w-sm w-full mx-auto space-y-6">
             
             <div class="space-y-2">
-                <h1 class="text-xl font-medium tracking-tight text-white">Initialize Environment</h1>
-                <p class="text-xs text-zinc-500 font-light">Set up a high-velocity workspace for your lean team.</p>
+                <h1 class="text-xl font-medium tracking-tight text-white">Create Workspace</h1>
+                <p class="text-xs text-zinc-500 font-light">Set up a workspace for your lean team.</p>
             </div>
 
             <!-- Standard Form Workspace -->
-            <form class="space-y-3.5" onsubmit="event.preventDefault();">
+            <form id="signupForm" class="space-y-3.5">
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
                         <label class="text-[11px] text-zinc-400 font-light tracking-wide" for="firstname">First Name</label>
@@ -98,10 +97,12 @@
                     <a href="#" class="text-zinc-400 hover:text-white underline">Privacy Node Policy</a>.
                 </p>
 
-                <button type="submit" 
-                    class="w-full bg-white hover:bg-zinc-200 text-black text-xs font-medium py-2.5 rounded-lg mt-1 transition-all shadow-sm cursor-pointer">
+                <button type="submit" id="signupButton"
+                    class="w-full bg-white hover:bg-zinc-200 text-black text-xs font-medium py-2.5 rounded-lg mt-1 transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                     Deploy Core Node
                 </button>
+                <div id="errorMessage" class="hidden text-xs text-red-400 mt-2 text-center"></div>
+                <div id="successMessage" class="hidden text-xs text-green-400 mt-2 text-center"></div>
             </form>
 
             <!-- Clean Text Separator -->
@@ -113,7 +114,7 @@
 
             <!-- Social Authentication Block -->
             <div class="grid grid-cols-2 gap-3">
-                <button class="flex items-center justify-center gap-2 bg-white/[0.01] hover:bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] rounded-lg py-2 text-xs text-zinc-300 transition-all cursor-pointer">
+                <button type="button" id="googleSignupButton" class="flex items-center justify-center gap-2 bg-white/[0.01] hover:bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] rounded-lg py-2 text-xs text-zinc-300 transition-all cursor-pointer">
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                         <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -132,10 +133,103 @@
 
             <div class="text-center pt-2">
                 <p class="text-xs text-zinc-500 font-light">
-                    Already have a token? 
-                    <a href="login.html" class="text-white hover:underline ml-1 font-normal">Log in</a>
+                    Already have a token?
+                    <a href="/auth/login" class="text-white hover:underline ml-1 font-normal">Log in</a>
                 </p>
             </div>
+    <script src="auth-utils.js"></script>
+    <script>
+        // Redirect if already authenticated
+        redirectIfAuthenticated();
+        
+        // Signup form handler
+        document.getElementById('signupForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const firstName = document.getElementById('firstname').value;
+            const lastName = document.getElementById('lastname').value;
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const button = document.getElementById('signupButton');
+            const errorMessage = document.getElementById('errorMessage');
+            const successMessage = document.getElementById('successMessage');
+            
+            // Reset messages
+            errorMessage.classList.add('hidden');
+            errorMessage.textContent = '';
+            successMessage.classList.add('hidden');
+            successMessage.textContent = '';
+            
+            // Basic validation
+            if (password.length < 8) {
+                errorMessage.textContent = 'Password must be at least 8 characters long.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+            
+            // Disable button and show loading state
+            button.disabled = true;
+            button.textContent = 'Creating Account...';
+            
+            try {
+                const response = await fetch('/auth/get-started', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        first_name: firstName,
+                        last_name: lastName,
+                        email: email,
+                        password: password
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Show success message
+                    successMessage.textContent = 'Account created successfully! Redirecting to login...';
+                    successMessage.classList.remove('hidden');
+                    
+                    // Redirect to login page after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = '/auth/login';
+                    }, 2000);
+                } else {
+                    // Show error message
+                    if (response.status === 409) {
+                        errorMessage.textContent = 'An account with this email already exists.';
+                    } else {
+                        errorMessage.textContent = data.detail || 'Signup failed. Please try again.';
+                    }
+                    errorMessage.classList.remove('hidden');
+                    
+                    // Re-enable button
+                    button.disabled = false;
+                    button.textContent = 'Deploy Core Node';
+                }
+            } catch (error) {
+                console.error('Signup error:', error);
+                errorMessage.textContent = 'Network error. Please check your connection and try again.';
+                errorMessage.classList.remove('hidden');
+                
+                // Re-enable button
+                button.disabled = false;
+                button.textContent = 'Deploy Core Node';
+            }
+        });
+        
+        // Google signup handler
+        document.getElementById('googleSignupButton').addEventListener('click', async () => {
+            try {
+                // Redirect to Google OAuth endpoint
+                window.location.href = '/auth/google-login';
+            } catch (error) {
+                console.error('Google signup error:', error);
+            }
+        });
+    </script>
 
         </div>
     </div>

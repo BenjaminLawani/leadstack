@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-[#030303]">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leadstack — Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Geist', sans-serif; background-color: #030303; color: #dedede; }
+        
+        /* Kanban Drag and Drop Styles */
+        .lead-card {
+            cursor: move;
+            transition: all 0.2s ease;
+        }
+        
+        .lead-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .lead-card.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg);
+        }
+        
+        .kanban-column {
+            transition: background-color 0.2s ease;
+        }
+        
+        .kanban-column.drag-over {
+            background-color: rgba(255, 255, 255, 0.02);
+            border: 2px dashed rgba(255, 255, 255, 0.2);
+            border-radius: 0.5rem;
+        }
+        
+        /* Sidebar Styles */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            height: 100vh;
+            background-color: #010101;
+            border-right: 1px solid rgba(255, 255, 255, 0.04);
+            transition: width 0.3s ease;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .sidebar.expanded {
+            width: 240px;
+        }
+        
+        .sidebar.collapsed {
+            width: 64px;
+        }
+        
+        .sidebar-header {
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 64px;
+        }
+        
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            overflow: hidden;
+        }
+        
+        .sidebar-logo-text {
+            font-size: 0.875rem;
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            color: white;
+            white-space: nowrap;
+            transition: opacity 0.3s ease;
+        }
+        
+        .sidebar.collapsed .sidebar-logo-text {
+            opacity: 0;
+            width: 0;
+        }
+        
+        .toggle-btn {
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 0.375rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .toggle-btn:hover {
+            background-color: rgba(255, 255, 255, 0.04);
+            color: white;
+        }
+        
+        .sidebar-nav {
+            flex: 1;
+            padding: 1rem 0;
+            overflow-y: auto;
+        }
+        
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            margin: 0.25rem 0.5rem;
+            color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            cursor: pointer;
+            font-size: 0.875rem;
+            white-space: nowrap;
+        }
+        
+        .nav-item:hover {
+            background-color: rgba(255, 255, 255, 0.04);
+            color: white;
+        }
+        
+        .nav-item.active {
+            background-color: rgba(255, 255, 255, 0.08);
+            color: white;
+        }
+        
+        .nav-item-icon {
+            min-width: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .nav-item-text {
+            transition: opacity 0.3s ease;
+        }
+        
+        .sidebar.collapsed .nav-item-text {
+            opacity: 0;
+            width: 0;
+        }
+        
+        .sidebar-footer {
+            padding: 1rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        
+        .user-profile {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        
+        .user-profile:hover {
+            background-color: rgba(255, 255, 255, 0.04);
+        }
+        
+        .user-avatar {
+            min-width: 32px;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        
+        .user-info {
+            overflow: hidden;
+            transition: opacity 0.3s ease;
+        }
+        
+        .sidebar.collapsed .user-info {
+            opacity: 0;
+            width: 0;
+        }
+        
+        .user-name {
+            font-size: 0.875rem;
+            color: white;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        
+        .user-email {
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.4);
+            white-space: nowrap;
+        }
+        
+        /* Main content adjustment */
+        .main-wrapper {
+            transition: margin-left 0.3s ease;
+        }
+        
+        .main-wrapper.sidebar-expanded {
+            margin-left: 240px;
+        }
+        
+        .main-wrapper.sidebar-collapsed {
+            margin-left: 64px;
+        }
+    </style>
+</head>
+<body class="antialiased min-h-screen">
+    
+    <!-- Sidebar Navigation -->
+    <aside id="sidebar" class="sidebar expanded">
+        <!-- Sidebar Header -->
+        <div class="sidebar-header">
+            <div class="sidebar-logo">
+                <svg class="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="9" stroke-opacity="0.2"/>
+                    <path d="M12 3v18" stroke-opacity="0.8"/>
+                </svg>
+                <span class="sidebar-logo-text">Leadstack</span>
+            </div>
+            <button id="toggleSidebar" class="toggle-btn">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M15 18l-6-6 6-6"/>
+                </svg>
+            </button>
+        </div>
+        
+        <!-- Navigation Items -->
+        <nav class="sidebar-nav">
+            <a href="#overview" class="nav-item active" data-page="overview">
+                <span class="nav-item-icon">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                </span>
+                <span class="nav-item-text">Overview</span>
+            </a>
+            
+            <a href="#analytics" class="nav-item" data-page="analytics">
+                <span class="nav-item-icon">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 3v18h18"/>
+                        <path d="M18 17V9"/>
+                        <path d="M13 17V5"/>
+                        <path d="M8 17v-3"/>
+                    </svg>
+                </span>
+                <span class="nav-item-text">Analytics</span>
+            </a>
+            
+            <a href="#pipeline" class="nav-item" data-page="pipeline">
+                <span class="nav-item-icon">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2v20"/>
+                        <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg>
+                </span>
+                <span class="nav-item-text">Pipeline</span>
+            </a>
+            
+            <a href="#steve" class="nav-item" data-page="steve">
+                <span class="nav-item-icon">
+                    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                </span>
+                <span class="nav-item-text">Steve</span>
+            </a>
+        </nav>
+        
+        <!-- User Profile -->
+        <div class="sidebar-footer">
+            <div class="user-profile">
+                <div class="user-avatar" id="userAvatar">U</div>
+                <div class="user-info">
+                    <div class="user-name" id="userName">User</div>
+                    <div class="user-email" id="userEmailSidebar">user@example.com</div>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Wrapper -->
+    <div id="mainWrapper" class="main-wrapper sidebar-expanded">
+        <!-- Header -->
+        <header class="border-b border-white/[0.04] bg-[#010101]">
+            <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-lg font-medium text-white">Dashboard</h1>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <button id="logoutButton" class="text-xs text-zinc-400 hover:text-white transition-colors">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-6 py-12">
+        <!-- Overview Page -->
+        <div id="overviewPage" class="space-y-6">
+            <div>
+                <h1 class="text-2xl font-medium text-white mb-2">Welcome to Leadstack</h1>
+                <p class="text-sm text-zinc-500">Your workspace is ready. Start managing your leads.</p>
+            </div>
+
+            <!-- Dashboard Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="bg-white/[0.01] border border-white/[0.06] rounded-lg p-6">
+                    <h3 class="text-sm font-medium text-white mb-2">Total Leads</h3>
+                    <p id="totalLeadsCount" class="text-3xl font-semibold text-white">0</p>
+                    <p id="totalLeadsStatus" class="text-xs text-zinc-500 mt-2">No leads yet</p>
+                </div>
+                
+                <div class="bg-white/[0.01] border border-white/[0.06] rounded-lg p-6">
+                    <h3 class="text-sm font-medium text-white mb-2">Active Campaigns</h3>
+                    <p class="text-3xl font-semibold text-white">0</p>
+                    <p class="text-xs text-zinc-500 mt-2">Start your first campaign</p>
+                </div>
+                
+                <div class="bg-white/[0.01] border border-white/[0.06] rounded-lg p-6">
+                    <h3 class="text-sm font-medium text-white mb-2">Conversion Rate</h3>
+                    <p class="text-3xl font-semibold text-white">0%</p>
+                    <p class="text-xs text-zinc-500 mt-2">Track your performance</p>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="bg-white/[0.01] border border-white/[0.06] rounded-lg p-6">
+                <h2 class="text-lg font-medium text-white mb-4">Quick Actions</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <button id="addLeadBtn" class="bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] rounded-lg p-4 text-left transition-all">
+                        <h3 class="text-sm font-medium text-white mb-1">Add New Lead</h3>
+                        <p class="text-xs text-zinc-500">Manually add a lead to your pipeline</p>
+                    </button>
+                    
+                    <button class="bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] rounded-lg p-4 text-left transition-all">
+                        <h3 class="text-sm font-medium text-white mb-1">Import Leads</h3>
+                        <p class="text-xs text-zinc-500">Upload a CSV file with your leads</p>
+                    </button>
+                    
+                    <button class="bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] rounded-lg p-4 text-left transition-all">
+                        <h3 class="text-sm font-medium text-white mb-1">Create Campaign</h3>
+                        <p class="text-xs text-zinc-500">Set up a new outreach campaign</p>
+                    </button>
+                    
+                    <button class="bg-white/[0.02] hover:bg-white/[0.04] border border-white/[0.06] rounded-lg p-4 text-left transition-all">
+                        <h3 class="text-sm font-medium text-white mb-1">View Analytics</h3>
+                        <p class="text-xs text-zinc-500">Check your performance metrics</p>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Leads Table -->
+            <div class="bg-white/[0.01] border border-white/[0.06] rounded-lg p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-medium text-white">Recent Leads</h2>
+                    <button id="refreshLeadsBtn" class="text-xs text-zinc-400 hover:text-white transition-colors">
+                        Refresh
+                    </button>
+                </div>
+                <div id="leadsTableContainer" class="overflow-x-auto">
+                    <table class="w-full">
+                        <thead>
+                            <tr class="border-b border-white/[0.06]">
+                                <th class="text-left text-xs font-medium text-zinc-400 pb-3">Name</th>
+                                <th class="text-left text-xs font-medium text-zinc-400 pb-3">Email</th>
+                                <th class="text-left text-xs font-medium text-zinc-400 pb-3">Company</th>
+                                <th class="text-left text-xs font-medium text-zinc-400 pb-3">Status</th>
+                                <th class="text-left text-xs font-medium text-zinc-400 pb-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leadsTableBody">
+                            <tr>
+                                <td colspan="5" class="text-center text-sm text-zinc-500 py-8">Loading leads...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Page (Kanban Board) -->
+        <div id="pipelinePage" class="space-y-6 hidden">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-medium text-white mb-2">Pipeline</h1>
+                    <p class="text-sm text-zinc-500">Drag and drop leads to update their pipeline status</p>
+                </div>
+                <button id="savePipelineChanges" class="hidden bg-white text-black px-4 py-2 rounded text-sm font-medium hover:bg-zinc-200 transition-colors">
+                    Save Changes
+                </button>
+            </div>
+
+            <!-- Kanban Board -->
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4" id="kanbanBoard">
+                <!-- NEW Column -->
+                <div class="bg-white/[0.01] border border-white/[0.06] rounded-lg p-4" data-status="NEW">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-white">New</h3>
+                        <span class="text-xs text-zinc-500 kanban-count" data-status="NEW">0</span>
+                    </div>
+                    <div class="space-y-2 kanban-column min-h-[400px]" data-status="NEW">
+                        <!-- Lead cards will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- IN_PROGRESS Column -->
+                <div class="bg-white/[0.01] border border-white/[0.06] rounded-lg p-4" data-status="IN_PROGRESS">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-white">In Progress</h3>
+                        <span class="text-xs text-zinc-500 kanban-count" data-status="IN_PROGRESS">0</span>
+                    </div>
+                    <div class="space-y-2 kanban-column min-h-[400px]" data-status="IN_PROGRESS">
+                        <!-- Lead cards will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- ACTIVE Column -->
+                <div class="bg-white/[0.01] border border-white/[0.06] rounded-lg p-4" data-status="ACTIVE">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-white">Active</h3>
+                        <span class="text-xs text-zinc-500 kanban-count" data-status="ACTIVE">0</span>
+                    </div>
+                    <div class="space-y-2 kanban-column min-h-[400px]" data-status="ACTIVE">
+                        <!-- Lead cards will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- WON Column -->
+                <div class="bg-white/[0.01] border border-white/[0.06] rounded-lg p-4" data-status="WON">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-white">Won</h3>
+                        <span class="text-xs text-zinc-500 kanban-count" data-status="WON">0</span>
+                    </div>
+                    <div class="space-y-2 kanban-column min-h-[400px]" data-status="WON">
+                        <!-- Lead cards will be inserted here -->
+                    </div>
+                </div>
+
+                <!-- LOST Column -->
+                <div class="bg-white/[0.01] border border-white/[0.06] rounded-lg p-4" data-status="LOST">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-medium text-white">Lost</h3>
+                        <span class="text-xs text-zinc-500 kanban-count" data-status="LOST">0</span>
+                    </div>
+                    <div class="space-y-2 kanban-column min-h-[400px]" data-status="LOST">
+                        <!-- Lead cards will be inserted here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        </main>
+
+        <!-- Add Lead Modal -->
+        <div id="addLeadModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-[#010101] border border-white/[0.06] rounded-lg p-6 max-w-md w-full mx-4">
+                <h2 class="text-lg font-medium text-white mb-4">Add New Lead</h2>
+                <form id="addLeadForm" class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">Name *</label>
+                        <input type="text" name="name" required class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">Email *</label>
+                        <input type="email" name="email" required class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">Company</label>
+                        <input type="text" name="company" class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">Phone</label>
+                        <input type="tel" name="phone" class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-zinc-400 mb-1">Status</label>
+                        <select name="status" class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
+                            <option value="new">New</option>
+                            <option value="contacted">Contacted</option>
+                            <option value="qualified">Qualified</option>
+                            <option value="converted">Converted</option>
+                            <option value="lost">Lost</option>
+                        </select>
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button type="submit" class="flex-1 bg-white text-black px-4 py-2 rounded text-sm font-medium hover:bg-zinc-200 transition-colors">
+                            Add Lead
+                        </button>
+                        <button type="button" id="cancelAddLeadBtn" class="flex-1 bg-white/[0.02] border border-white/[0.06] text-white px-4 py-2 rounded text-sm font-medium hover:bg-white/[0.04] transition-colors">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- View Notes Modal -->
+        <div id="viewNotesModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div class="bg-[#010101] border border-white/[0.06] rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-medium text-white">Notes for <span id="notesLeadName"></span></h2>
+                    <button id="closeNotesBtn" class="text-zinc-400 hover:text-white">
+                        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 6L6 18M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <div id="notesContainer" class="space-y-3 mb-4">
+                    <p class="text-sm text-zinc-500">Loading notes...</p>
+                </div>
+                <div class="border-t border-white/[0.06] pt-4">
+                    <h3 class="text-sm font-medium text-white mb-2">Add Note</h3>
+                    <form id="addNoteForm" class="space-y-3">
+                        <textarea name="content" required rows="3" placeholder="Enter note content..." class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]"></textarea>
+                        <div>
+                            <label class="block text-xs text-zinc-400 mb-1">Tags (comma-separated)</label>
+                            <input type="text" name="tags" placeholder="e.g., follow-up, important" class="w-full bg-white/[0.02] border border-white/[0.06] rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-white/[0.12]">
+                        </div>
+                        <button type="submit" class="bg-white text-black px-4 py-2 rounded text-sm font-medium hover:bg-zinc-200 transition-colors">
+                            Add Note
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="auth-utils.js"></script>
+    <script>
+        // Require authentication
+        //requireAuth();
+        
+        // API Base URL
+        const API_BASE_URL = window.location.origin;
+        
+        // Get user info from token (you can decode JWT or fetch from API)
+        const token = getAuthToken();
+        if (token) {
+            // For now, just show that user is logged in
+            // In production, you'd decode the JWT or fetch user info from API
+            document.getElementById('userEmailSidebar').textContent = 'Logged in';
+            document.getElementById('userName').textContent = 'User';
+            document.getElementById('userAvatar').textContent = 'U';
+        }
+        
+        // API Helper Functions
+        async function apiRequest(endpoint, options = {}) {
+            const token = getAuthToken();
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+            
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+            
+            const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+                ...options,
+                headers
+            });
+            
+            if (!response.ok) {
+                const error = await response.json().catch(() => ({ detail: 'Request failed' }));
+                throw new Error(error.detail || `HTTP ${response.status}`);
+            }
+            
+            return response.json();
+        }
+        
+        // Leads API Functions
+        async function fetchLeads() {
+            try {
+                const leads = await apiRequest('/leads/');
+                return leads;
+            } catch (error) {
+                console.error('Error fetching leads:', error);
+                return [];
+            }
+        }
+        
+        async function createLead(leadData) {
+            try {
+                const lead = await apiRequest('/leads/', {
+                    method: 'POST',
+                    body: JSON.stringify(leadData)
+                });
+                return lead;
+            } catch (error) {
+                console.error('Error creating lead:', error);
+                throw error;
+            }
+        }
+        
+        async function updateLead(leadId, leadData) {
+            try {
+                const lead = await apiRequest(`/leads/${leadId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(leadData)
+                });
+                return lead;
+            } catch (error) {
+                console.error('Error updating lead:', error);
+                throw error;
+            }
+        }
+        
+        // Notes API Functions
+        async function fetchNotesForLead(leadId) {
+            try {
+                const notes = await apiRequest(`/notes/${leadId}/`);
+                return notes;
+            } catch (error) {
+                console.error('Error fetching notes:', error);
+                return [];
+            }
+        }
+        
+        async function createNote(leadId, noteData) {
+            try {
+                const note = await apiRequest(`/notes/${leadId}/`, {
+                    method: 'POST',
+                    body: JSON.stringify(noteData)
+                });
+                return note;
+            } catch (error) {
+                console.error('Error creating note:', error);
+                throw error;
+            }
+        }
+        
+        async function updateNote(leadId, noteId, noteData) {
+            try {
+                const note = await apiRequest(`/notes/${leadId}/${noteId}`, {
+                    method: 'PUT',
+                    body: JSON.stringify(noteData)
+                });
+                return note;
+            } catch (error) {
+                console.error('Error updating note:', error);
+                throw error;
+            }
+        }
+        
+        // Dashboard Data Loading
+        async function loadDashboardData() {
+            try {
+                const leads = await fetchLeads();
+                updateDashboardStats(leads);
+                displayRecentLeads(leads);
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            }
+        }
+        
+        function updateDashboardStats(leads) {
+            const totalLeadsElement = document.querySelector('.grid > div:first-child p.text-3xl');
+            if (totalLeadsElement) {
+                totalLeadsElement.textContent = leads.length;
+                const statusText = totalLeadsElement.nextElementSibling;
+                if (statusText) {
+                    statusText.textContent = leads.length === 0 ? 'No leads yet' : `${leads.length} total leads`;
+                }
+            }
+        }
+        
+        function displayRecentLeads(leads) {
+            // This function can be expanded to show recent leads in a table or list
+            console.log('Recent leads:', leads.slice(0, 5));
+        }
+        
+        // Initialize dashboard on load
+        if (token) {
+            loadDashboardData();
+        }
+        
+        function updateDashboardStats(leads) {
+            const totalLeadsCount = document.getElementById('totalLeadsCount');
+            const totalLeadsStatus = document.getElementById('totalLeadsStatus');
+            
+            if (totalLeadsCount) {
+                totalLeadsCount.textContent = leads.length;
+            }
+            if (totalLeadsStatus) {
+                totalLeadsStatus.textContent = leads.length === 0 ? 'No leads yet' : `${leads.length} total leads`;
+            }
+        }
+        
+        function displayRecentLeads(leads) {
+            const tbody = document.getElementById('leadsTableBody');
+            if (!tbody) return;
+            
+            if (leads.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-sm text-zinc-500 py-8">No leads yet. Add your first lead!</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = leads.map(lead => `
+                <tr class="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                    <td class="py-3 text-sm text-white">${escapeHtml(lead.name)}</td>
+                    <td class="py-3 text-sm text-zinc-400">${escapeHtml(lead.email)}</td>
+                    <td class="py-3 text-sm text-zinc-400">${escapeHtml(lead.company || '-')}</td>
+                    <td class="py-3">
+                        <span class="inline-flex items-center px-2 py-1 rounded text-xs font-medium ${getStatusColor(lead.status)}">
+                            ${escapeHtml(lead.status || 'new')}
+                        </span>
+                    </td>
+                    <td class="py-3">
+                        <button onclick="viewLeadNotes('${lead.id}', '${escapeHtml(lead.name)}')" class="text-xs text-blue-400 hover:text-blue-300 transition-colors">
+                            View Notes
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function getStatusColor(status) {
+            const colors = {
+                'new': 'bg-blue-500/10 text-blue-400',
+                'contacted': 'bg-yellow-500/10 text-yellow-400',
+                'qualified': 'bg-purple-500/10 text-purple-400',
+                'converted': 'bg-green-500/10 text-green-400',
+                'lost': 'bg-red-500/10 text-red-400'
+            };
+            return colors[status] || colors['new'];
+        }
+        
+        // Modal Management
+        function showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.remove('hidden');
+            }
+        }
+        
+        function hideModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.classList.add('hidden');
+            }
+        }
+        
+        // Add Lead Functionality
+        document.getElementById('addLeadBtn')?.addEventListener('click', () => {
+            showModal('addLeadModal');
+        });
+        
+        document.getElementById('cancelAddLeadBtn')?.addEventListener('click', () => {
+            hideModal('addLeadModal');
+            document.getElementById('addLeadForm').reset();
+        });
+        
+        document.getElementById('addLeadForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const leadData = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                company: formData.get('company') || null,
+                phone: formData.get('phone') || null,
+                status: formData.get('status') || 'new'
+            };
+            
+            try {
+                await createLead(leadData);
+                hideModal('addLeadModal');
+                e.target.reset();
+                await loadDashboardData();
+                alert('Lead added successfully!');
+            } catch (error) {
+                alert(`Error adding lead: ${error.message}`);
+            }
+        });
+        
+        // Refresh Leads
+        document.getElementById('refreshLeadsBtn')?.addEventListener('click', () => {
+            loadDashboardData();
+        });
+        
+        // View Notes Functionality
+        let currentLeadId = null;
+        
+        async function viewLeadNotes(leadId, leadName) {
+            currentLeadId = leadId;
+            document.getElementById('notesLeadName').textContent = leadName;
+            showModal('viewNotesModal');
+            
+            try {
+                const notes = await fetchNotesForLead(leadId);
+                displayNotes(notes);
+            } catch (error) {
+                console.error('Error loading notes:', error);
+                document.getElementById('notesContainer').innerHTML = '<p class="text-sm text-red-400">Error loading notes</p>';
+            }
+        }
+        
+        function displayNotes(notes) {
+            const container = document.getElementById('notesContainer');
+            if (!container) return;
+            
+            if (notes.length === 0) {
+                container.innerHTML = '<p class="text-sm text-zinc-500">No notes yet. Add your first note below.</p>';
+                return;
+            }
+            
+            container.innerHTML = notes.map(note => `
+                <div class="bg-white/[0.02] border border-white/[0.06] rounded-lg p-4">
+                    <p class="text-sm text-white mb-2">${escapeHtml(note.content)}</p>
+                    ${note.tags && note.tags.length > 0 ? `
+                        <div class="flex gap-2 flex-wrap">
+                            ${note.tags.map(tag => `
+                                <span class="inline-flex items-center px-2 py-1 rounded text-xs bg-zinc-800 text-zinc-300">
+                                    ${escapeHtml(tag)}
+                                </span>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                    <p class="text-xs text-zinc-500 mt-2">${new Date(note.created_at).toLocaleString()}</p>
+                </div>
+            `).join('');
+        }
+        
+        document.getElementById('closeNotesBtn')?.addEventListener('click', () => {
+            hideModal('viewNotesModal');
+            currentLeadId = null;
+        });
+        
+        document.getElementById('addNoteForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!currentLeadId) return;
+            
+            const formData = new FormData(e.target);
+            const tagsInput = formData.get('tags');
+            const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+            
+            const noteData = {
+                content: formData.get('content'),
+                tags: tags
+            };
+            
+            try {
+                await createNote(currentLeadId, noteData);
+                e.target.reset();
+                const notes = await fetchNotesForLead(currentLeadId);
+                displayNotes(notes);
+                alert('Note added successfully!');
+            } catch (error) {
+                alert(`Error adding note: ${error.message}`);
+            }
+        });
+        
+        // Make viewLeadNotes available globally
+        window.viewLeadNotes = viewLeadNotes;
+        
+        // Logout handler
+        document.getElementById('logoutButton').addEventListener('click', () => {
+            logout();
+        });
+        
+        // Sidebar toggle functionality
+        const sidebar = document.getElementById('sidebar');
+        const mainWrapper = document.getElementById('mainWrapper');
+        const toggleBtn = document.getElementById('toggleSidebar');
+        const toggleIcon = toggleBtn.querySelector('svg path');
+        
+        toggleBtn.addEventListener('click', () => {
+            const isExpanded = sidebar.classList.contains('expanded');
+            
+            if (isExpanded) {
+                sidebar.classList.remove('expanded');
+                sidebar.classList.add('collapsed');
+                mainWrapper.classList.remove('sidebar-expanded');
+                mainWrapper.classList.add('sidebar-collapsed');
+                toggleIcon.setAttribute('d', 'M9 18l6-6-6-6');
+            } else {
+                sidebar.classList.remove('collapsed');
+                sidebar.classList.add('expanded');
+                mainWrapper.classList.remove('sidebar-collapsed');
+                mainWrapper.classList.add('sidebar-expanded');
+                toggleIcon.setAttribute('d', 'M15 18l-6-6 6-6');
+            }
+            
+            // Save state to localStorage
+            localStorage.setItem('sidebarExpanded', !isExpanded);
+        });
+        
+        // Restore sidebar state from localStorage
+        const savedState = localStorage.getItem('sidebarExpanded');
+        if (savedState === 'false') {
+            toggleBtn.click();
+        }
+        
+        // Navigation active state and page switching
+        const navItems = document.querySelectorAll('.nav-item');
+        const pages = {
+            'overview': document.getElementById('overviewPage'),
+            'pipeline': document.getElementById('pipelinePage')
+        };
+        
+        navItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                // Remove active class from all items
+                navItems.forEach(nav => nav.classList.remove('active'));
+                
+                // Add active class to clicked item
+                item.classList.add('active');
+                
+                // Show the corresponding page
+                const page = item.getAttribute('data-page');
+                
+                // Hide all pages
+                Object.values(pages).forEach(p => {
+                    if (p) p.classList.add('hidden');
+                });
+                
+                // Show selected page
+                if (pages[page]) {
+                    pages[page].classList.remove('hidden');
+                    
+                    // Load pipeline data if pipeline page is selected
+                    if (page === 'pipeline') {
+                        loadPipelineData();
+                    }
+                }
+            });
+        });
+        
+        // Pipeline Kanban Board Functionality
+        let pipelineChanges = new Map(); // Track changes: leadId -> newStatus
+        
+        async function loadPipelineData() {
+            try {
+                const leads = await fetchLeads();
+                displayKanbanBoard(leads);
+                pipelineChanges.clear();
+                document.getElementById('savePipelineChanges').classList.add('hidden');
+            } catch (error) {
+                console.error('Error loading pipeline data:', error);
+            }
+        }
+        
+        function displayKanbanBoard(leads) {
+            // Clear all columns
+            const columns = document.querySelectorAll('.kanban-column');
+            columns.forEach(col => col.innerHTML = '');
+            
+            // Group leads by pipeline status
+            const leadsByStatus = {
+                'NEW': [],
+                'IN_PROGRESS': [],
+                'ACTIVE': [],
+                'WON': [],
+                'LOST': []
+            };
+            
+            leads.forEach(lead => {
+                const status = lead.pipeline_status || 'NEW';
+                if (leadsByStatus[status]) {
+                    leadsByStatus[status].push(lead);
+                }
+            });
+            
+            // Populate columns
+            Object.keys(leadsByStatus).forEach(status => {
+                const column = document.querySelector(`.kanban-column[data-status="${status}"]`);
+                const count = document.querySelector(`.kanban-count[data-status="${status}"]`);
+                
+                if (column && count) {
+                    count.textContent = leadsByStatus[status].length;
+                    
+                    leadsByStatus[status].forEach(lead => {
+                        const card = createLeadCard(lead);
+                        column.appendChild(card);
+                    });
+                }
+            });
+            
+            // Initialize drag and drop
+            initializeDragAndDrop();
+        }
+        
+        function createLeadCard(lead) {
+            const card = document.createElement('div');
+            card.className = 'lead-card bg-white/[0.02] border border-white/[0.06] rounded-lg p-3 cursor-move';
+            card.draggable = true;
+            card.dataset.leadId = lead.id;
+            card.dataset.currentStatus = lead.pipeline_status || 'NEW';
+            
+            const statusColor = getLeadStatusColor(lead.lead_status);
+            
+            card.innerHTML = `
+                <div class="flex items-start justify-between mb-2">
+                    <h4 class="text-sm font-medium text-white">${escapeHtml(lead.name)}</h4>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusColor}">
+                        ${escapeHtml(lead.lead_status)}
+                    </span>
+                </div>
+                <p class="text-xs text-zinc-400 mb-1">${escapeHtml(lead.email || 'No email')}</p>
+                ${lead.company ? `<p class="text-xs text-zinc-500">${escapeHtml(lead.company)}</p>` : ''}
+            `;
+            
+            return card;
+        }
+        
+        function getLeadStatusColor(status) {
+            const colors = {
+                'HOT': 'bg-red-500/10 text-red-400',
+                'WARM': 'bg-yellow-500/10 text-yellow-400',
+                'COLD': 'bg-blue-500/10 text-blue-400'
+            };
+            return colors[status] || colors['COLD'];
+        }
+        
+        function initializeDragAndDrop() {
+            const cards = document.querySelectorAll('.lead-card');
+            const columns = document.querySelectorAll('.kanban-column');
+            
+            cards.forEach(card => {
+                card.addEventListener('dragstart', handleDragStart);
+                card.addEventListener('dragend', handleDragEnd);
+            });
+            
+            columns.forEach(column => {
+                column.addEventListener('dragover', handleDragOver);
+                column.addEventListener('drop', handleDrop);
+                column.addEventListener('dragleave', handleDragLeave);
+            });
+        }
+        
+        let draggedElement = null;
+        
+        function handleDragStart(e) {
+            draggedElement = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/html', this.innerHTML);
+        }
+        
+        function handleDragEnd(e) {
+            this.classList.remove('dragging');
+            
+            // Remove drag-over class from all columns
+            document.querySelectorAll('.kanban-column').forEach(col => {
+                col.classList.remove('drag-over');
+            });
+        }
+        
+        function handleDragOver(e) {
+            if (e.preventDefault) {
+                e.preventDefault();
+            }
+            
+            e.dataTransfer.dropEffect = 'move';
+            this.classList.add('drag-over');
+            
+            return false;
+        }
+        
+        function handleDragLeave(e) {
+            this.classList.remove('drag-over');
+        }
+        
+        function handleDrop(e) {
+            if (e.stopPropagation) {
+                e.stopPropagation();
+            }
+            
+            this.classList.remove('drag-over');
+            
+            if (draggedElement && draggedElement !== this) {
+                const newStatus = this.dataset.status;
+                const leadId = draggedElement.dataset.leadId;
+                const oldStatus = draggedElement.dataset.currentStatus;
+                
+                // Only track if status actually changed
+                if (newStatus !== oldStatus) {
+                    // Update the card's status
+                    draggedElement.dataset.currentStatus = newStatus;
+                    
+                    // Track the change
+                    pipelineChanges.set(leadId, newStatus);
+                    
+                    // Move the card to the new column
+                    this.appendChild(draggedElement);
+                    
+                    // Update column counts
+                    updateColumnCounts();
+                    
+                    // Show save button
+                    document.getElementById('savePipelineChanges').classList.remove('hidden');
+                }
+            }
+            
+            return false;
+        }
+        
+        function updateColumnCounts() {
+            const columns = document.querySelectorAll('.kanban-column');
+            columns.forEach(column => {
+                const status = column.dataset.status;
+                const count = column.querySelectorAll('.lead-card').length;
+                const countElement = document.querySelector(`.kanban-count[data-status="${status}"]`);
+                if (countElement) {
+                    countElement.textContent = count;
+                }
+            });
+        }
+        
+        // Save pipeline changes
+        document.getElementById('savePipelineChanges')?.addEventListener('click', async () => {
+            const saveBtn = document.getElementById('savePipelineChanges');
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+            
+            try {
+                // Update all changed leads
+                const updatePromises = Array.from(pipelineChanges.entries()).map(([leadId, newStatus]) => {
+                    return updateLead(leadId, { pipeline_status: newStatus });
+                });
+                
+                await Promise.all(updatePromises);
+                
+                // Clear changes and hide button
+                pipelineChanges.clear();
+                saveBtn.classList.add('hidden');
+                saveBtn.textContent = 'Save Changes';
+                saveBtn.disabled = false;
+                
+                alert('Pipeline changes saved successfully!');
+            } catch (error) {
+                console.error('Error saving pipeline changes:', error);
+                alert(`Error saving changes: ${error.message}`);
+                saveBtn.textContent = 'Save Changes';
+                saveBtn.disabled = false;
+            }
+        });
+    </script>
+
+</body>
+</html>

@@ -23,4 +23,7 @@ class User(Base):
     created_at = Column(DateTime(), default=func.now(), index=True, nullable=False)
     updated_at = Column(DateTime(), default=func.now(), nullable=False, server_onupdate=func.now())
     login_method = Column(ENUM(LoginMethod),nullable=False)
-    
+
+    # relationships
+    leads = relationship("Lead", back_populates="owner")
+    notes = relationship("Note", back_populates="owner")

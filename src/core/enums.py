@@ -32,3 +32,9 @@ class MessageTone(StrEnum):
     CASUAL = "CASUAL"
     PROFESSIONAL = "PROFESSIONAL"
     FRIENDLY = "FRIENDLY"
+
+class NoteTag(StrEnum):
+    FOLLOW_UP = "FOLLOW_UP"
+    REMINDER = "REMINDER"
+    IMPORTANT = "IMPORTANT"
+    URGENT = "URGENT"

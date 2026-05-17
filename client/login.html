@@ -61,7 +61,7 @@
             </div>
 
             <!-- Standard Form Workspace -->
-            <form class="space-y-4" onsubmit="event.preventDefault();">
+            <form id="loginForm" class="space-y-4">
                 <div class="space-y-1">
                     <label class="text-[11px] text-zinc-400 font-light tracking-wide" for="email">Workspace Email</label>
                     <input type="email" id="email" autocomplete="off" required
@@ -79,10 +79,11 @@
                         placeholder="••••••••">
                 </div>
 
-                <button type="submit" 
-                    class="w-full bg-white hover:bg-zinc-200 text-black text-xs font-medium py-2.5 rounded-lg mt-2 transition-all shadow-sm cursor-pointer">
+                <button type="submit" id="loginButton"
+                    class="w-full bg-white hover:bg-zinc-200 text-black text-xs font-medium py-2.5 rounded-lg mt-2 transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                     Access Workspace
                 </button>
+                <div id="errorMessage" class="hidden text-xs text-red-400 mt-2 text-center"></div>
             </form>
 
             <!-- Clean Text Separator -->
@@ -94,7 +95,7 @@
 
             <!-- Social Authentication Block -->
             <div class="grid grid-cols-2 gap-3">
-                <button class="flex items-center justify-center gap-2 bg-white/[0.01] hover:bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] rounded-lg py-2 text-xs text-zinc-300 transition-all cursor-pointer">
+                <button type="button" id="googleLoginButton" class="flex items-center justify-center gap-2 bg-white/[0.01] hover:bg-white/[0.03] border border-white/[0.06] hover:border-white/[0.12] rounded-lg py-2 text-xs text-zinc-300 transition-all cursor-pointer">
                     <!-- Google SVG Icon -->
                     <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -115,11 +116,81 @@
 
             <div class="text-center pt-2">
                 <p class="text-xs text-zinc-500 font-light">
-                    New to Leadstack? 
-                    <a href="signup.html" class="text-white hover:underline ml-1 font-normal">Create an account</a>
+                    New to Leadstack?
+                    <a href="/auth/get-started" class="text-white hover:underline ml-1 font-normal">Create an account</a>
                 </p>
             </div>
 
+    <script src="auth-utils.js"></script>
+    <script>
+        // Redirect if already authenticated
+        redirectIfAuthenticated();
+        
+        // Login form handler
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const button = document.getElementById('loginButton');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            // Reset error message
+            errorMessage.classList.add('hidden');
+            errorMessage.textContent = '';
+            
+            // Disable button and show loading state
+            button.disabled = true;
+            button.textContent = 'Accessing...';
+            
+            try {
+                // Create form data for OAuth2PasswordRequestForm
+                const formData = new URLSearchParams();
+                formData.append('username', email);
+                formData.append('password', password);
+                
+                const response = await fetch('/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Store token using utility function
+                    storeAuthToken(data.access_token, data.token_type);
+                    
+                    // Redirect to dashboard
+                    window.location.href = '/dashboard.html';
+                } else {
+                    // Show error message
+                    errorMessage.textContent = data.detail || 'Login failed. Please try again.';
+                    errorMessage.classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                errorMessage.textContent = 'Network error. Please check your connection and try again.';
+                errorMessage.classList.remove('hidden');
+            } finally {
+                // Re-enable button
+                button.disabled = false;
+                button.textContent = 'Access Workspace';
+            }
+        });
+        
+        // Google login handler
+        document.getElementById('googleLoginButton').addEventListener('click', async () => {
+            try {
+                // Redirect to Google OAuth endpoint
+                window.location.href = '/auth/google-login';
+            } catch (error) {
+                console.error('Google login error:', error);
+            }
+        });
+    </script>
         </div>
     </div>
 

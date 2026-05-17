@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_ID: str = os.environ["GOOGLE_CLIENT_ID"]
     GOOGLE_CLIENT_SECRET: str = os.environ["GOOGLE_CLIENT_SECRET"]
     GOOGLE_REDIRECT_URI: str = os.environ["GOOGLE_REDIRECT_URI"]
+    
+    # AI Configuration
+    GROQ_API_KEY: str = os.environ.get("GROQ_API_KEY", "")
+    SERPER_API_KEY: str = os.environ.get("SERPER_API_KEY", "")
 
 
 settings = Settings()
