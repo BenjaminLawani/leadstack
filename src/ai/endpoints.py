@@ -51,19 +51,26 @@ class AgentQueryResponse(BaseModel):
     """Response model for agent queries"""
     response: str
     data: Optional[Dict[str, Any]] = None
+    csv_content: Optional[str] = None
+    is_csv: bool = False
 
 
 # Initialize the Pydantic AI Agent
 agent = Agent(
     "groq:llama-3.3-70b-versatile",
-    system_prompt="""You are a lead generation assistant specialized in finding and processing business leads.
-    
+    system_prompt="""You are Steve, a lead generation assistant specialized in finding and processing business leads.
+
 Your capabilities include:
 1. Searching the web for potential leads based on industry, location, job titles, and other criteria
 2. Processing and analyzing CSV files containing lead data
 3. Extracting contact information from search results
 4. Filtering and organizing lead data
 5. Providing insights and recommendations for lead generation strategies
+
+IMPORTANT: When the user asks for CSV, export, download, spreadsheet, or Excel output:
+- Use the search tools to gather lead data
+- Once you have the data, use the create_csv_from_leads tool to generate CSV content
+- The system will automatically provide a download link to the user
 
 When searching for leads, you should:
 - Use specific search queries that include industry, location, and relevant keywords
@@ -77,7 +84,12 @@ When processing CSV data, you should:
 - Extract relevant lead fields
 - Identify data quality issues
 
-Always provide clear, actionable results and explain your reasoning.""",
+For regular chat queries (not requesting CSV):
+- Provide clear, conversational responses
+- Offer actionable advice and insights
+- Explain your reasoning and recommendations
+
+Always be helpful, professional, and focused on helping users generate and manage leads effectively.""",
     retries=2,
 )
 
@@ -368,23 +380,76 @@ async def process_csv(request: CSVProcessRequest):
 @ai_router.post("/query", response_model=AgentQueryResponse)
 async def query_agent(request: AgentQueryRequest):
     """
-    Send a natural language query to the AI agent
+    Send a natural language query to the AI agent.
+    Intelligently returns CSV content if requested, otherwise returns chat response.
     """
     try:
+        # Detect if user is requesting CSV output
+        query_lower = request.query.lower()
+        csv_keywords = ['csv', 'export', 'download', 'spreadsheet', 'excel']
+        wants_csv = any(keyword in query_lower for keyword in csv_keywords)
+        
         # Run the agent with the query
         result = await agent.run(
             request.query,
             message_history=[],
         )
         
-        # Extract response
-        response_data = getattr(result, 'data', None)
-        response_text = str(response_data) if response_data else str(result)
+        # Extract the actual text response from the agent
+        response_text = str(getattr(result, 'data', ''))
         
-        return AgentQueryResponse(
-            response=response_text,
-            data=response_data,
-        )
+        # Check if the agent used tools and extract data
+        csv_content = None
+        leads_data = []
+        
+        # Try to extract structured data from tool calls
+        try:
+            if hasattr(result, 'all_messages'):
+                for message in result.all_messages():
+                    if hasattr(message, 'parts'):
+                        for part in message.parts:
+                            part_type = type(part).__name__
+                            
+                            # Check for ToolReturnPart which contains tool results
+                            if part_type == 'ToolReturnPart':
+                                tool_content = getattr(part, 'content', None)
+                                tool_name = getattr(part, 'tool_name', '')
+                                
+                                if isinstance(tool_content, dict):
+                                    # Check if this is CSV creation result
+                                    if tool_name == 'create_csv_from_leads' and 'csv_content' in tool_content:
+                                        csv_content = tool_content.get('csv_content')
+                                    
+                                    # Check for leads data from search tools
+                                    if 'results' in tool_content and isinstance(tool_content['results'], list):
+                                        leads_data.extend(tool_content['results'])
+                                    elif 'leads' in tool_content and isinstance(tool_content['leads'], list):
+                                        leads_data.extend(tool_content['leads'])
+        except Exception:
+            # If we can't extract tool data, continue with text response
+            pass
+        
+        # If CSV was requested but not created, try to create it from any leads data
+        if wants_csv and not csv_content and leads_data:
+            from src.core.utils import csv_service
+            csv_content = csv_service.create_csv_content(leads_data)
+        
+        # Return appropriate response
+        if csv_content:
+            return AgentQueryResponse(
+                response="CSV file generated successfully",
+                data={"lead_count": len(leads_data)},
+                csv_content=csv_content,
+                is_csv=True,
+            )
+        else:
+            # Regular chat response - return the agent's natural language response
+            return AgentQueryResponse(
+                response=response_text,
+                data=None,
+                csv_content=None,
+                is_csv=False,
+            )
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

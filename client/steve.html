@@ -666,6 +666,50 @@
                 // Remove loading indicator
                 removeLoadingIndicator();
                 
+                // Check if response contains CSV data
+                if (data.is_csv && data.csv_content) {
+                    // Create a download link for the CSV
+                    const blob = new Blob([data.csv_content], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const timestamp = new Date().toISOString().split('T')[0];
+                    const filename = `leads_${timestamp}.csv`;
+                    
+                    // Add message with download button
+                    const messageDiv = document.createElement("div");
+                    messageDiv.className = "flex justify-start";
+                    
+                    const messageBubble = document.createElement("div");
+                    messageBubble.className = "max-w-[80%] rounded-2xl px-4 py-3 bg-white/[0.04] text-zinc-300 border border-white/[0.06]";
+                    messageBubble.innerHTML = `
+                        <p class="mb-3">${data.response}</p>
+                        <a href="${url}" download="${filename}"
+                           class="inline-flex items-center gap-2 px-4 py-2 bg-white/[0.08] hover:bg-white/[0.12] rounded-lg transition text-white text-sm">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="7 10 12 15 17 10"/>
+                                <line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            Download CSV (${data.data?.lead_count || 0} leads)
+                        </a>
+                    `;
+                    
+                    messageDiv.appendChild(messageBubble);
+                    chatMessages.appendChild(messageDiv);
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                    
+                    // Update message history with text response only
+                    messageHistory.push({
+                        role: 'user',
+                        content: message
+                    });
+                    messageHistory.push({
+                        role: 'assistant',
+                        content: data.response
+                    });
+                    
+                    return;
+                }
+                
                 // Format response based on endpoint
                 let responseText;
                 if (endpoint === '/ai/search-leads' && data.leads && data.leads.length > 0) {
