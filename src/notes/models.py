@@ -10,6 +10,7 @@ from sqlalchemy import (
 
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import (
+    JSONB,
     UUID,
     ENUM
 )
@@ -24,7 +25,7 @@ class Note(Base):
     owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     content = Column(String(1024), nullable=False)
 
-    tags = Column(ENUM(NoteTag), nullable=True,)
+    tags = Column(JSONB(), nullable=True, default=dict)
 
     created_at = Column(DateTime, default=func.now(), index=True, nullable=False)
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now(), nullable=False)

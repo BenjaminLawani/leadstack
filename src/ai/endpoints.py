@@ -3,9 +3,14 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.groq import GroqModel
+from sqlalchemy.orm import Session
 
 from src.core.config import settings
 from src.core.utils import web_search_service, csv_service
+from src.core.security import get_current_user
+from src.core.db import get_db
+from src.auth.models import User
+from src.leads.models import Lead
 
 
 # Pydantic models for API requests/responses
@@ -55,9 +60,20 @@ class AgentQueryResponse(BaseModel):
     is_csv: bool = False
 
 
+# Define dependencies type for the agent
+class AgentDeps(BaseModel):
+    """Dependencies passed to agent tools"""
+    user_id: Optional[Any] = None
+    db: Optional[Any] = None
+    
+    class Config:
+        arbitrary_types_allowed = True
+
+
 # Initialize the Pydantic AI Agent
 agent = Agent(
     "groq:llama-3.3-70b-versatile",
+    deps_type=AgentDeps,
     system_prompt="""You are Steve, a lead generation assistant specialized in finding and processing business leads.
 
 Your capabilities include:
@@ -65,12 +81,18 @@ Your capabilities include:
 2. Processing and analyzing CSV files containing lead data
 3. Extracting contact information from search results
 4. Filtering and organizing lead data
-5. Providing insights and recommendations for lead generation strategies
+5. Accessing and analyzing the user's existing leads in their database
+6. Providing insights and recommendations for lead generation strategies
 
 IMPORTANT: When the user asks for CSV, export, download, spreadsheet, or Excel output:
 - Use the search tools to gather lead data
 - Once you have the data, use the create_csv_from_leads tool to generate CSV content
 - The system will automatically provide a download link to the user
+
+When the user asks about their leads, pipeline, or existing data:
+- Use the get_user_leads tool to fetch their current leads from the database
+- You can filter by pipeline_status, lead_status, or company name
+- Provide analysis, insights, and recommendations based on their actual data
 
 When searching for leads, you should:
 - Use specific search queries that include industry, location, and relevant keywords
@@ -97,7 +119,7 @@ Always be helpful, professional, and focused on helping users generate and manag
 # Tool functions for the agent
 @agent.tool
 async def search_web_for_leads(
-    ctx: RunContext,
+    ctx: RunContext[AgentDeps],
     industry: str,
     location: Optional[str] = None,
     job_title: Optional[str] = None,
@@ -139,7 +161,7 @@ async def search_web_for_leads(
 
 @agent.tool
 async def perform_web_search(
-    ctx: RunContext,
+    ctx: RunContext[AgentDeps],
     query: str,
     num_results: int = 10,
 ) -> Dict[str, Any]:
@@ -176,7 +198,7 @@ async def perform_web_search(
 
 @agent.tool
 def process_csv_data(
-    ctx: RunContext,
+    ctx: RunContext[AgentDeps],
     csv_content: str,
     field_mapping: Optional[Dict[str, str]] = None,
 ) -> Dict[str, Any]:
@@ -213,7 +235,7 @@ def process_csv_data(
 
 @agent.tool
 def filter_csv_leads(
-    ctx: RunContext,
+    ctx: RunContext[AgentDeps],
     csv_content: str,
     filters: Dict[str, Any],
 ) -> Dict[str, Any]:
@@ -251,7 +273,7 @@ def filter_csv_leads(
 
 @agent.tool
 def create_csv_from_leads(
-    ctx: RunContext,
+    ctx: RunContext[AgentDeps],
     leads: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     """
@@ -279,12 +301,87 @@ def create_csv_from_leads(
         }
 
 
+@agent.tool
+def get_user_leads(
+    ctx: RunContext[AgentDeps],
+    filters: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Fetch the current user's leads from the database to provide context.
+    Use this when the user asks about their existing leads, pipeline, or wants analysis.
+    
+    Args:
+        filters: Optional filters to apply (e.g., {"pipeline_status": "NEW", "lead_status": "QUALIFIED"})
+    
+    Returns:
+        Dictionary with user's leads data
+    """
+    try:
+        # Get user_id and db from context
+        if not ctx.deps or not ctx.deps.user_id or not ctx.deps.db:
+            return {
+                "success": False,
+                "error": "User context not available",
+                "leads": [],
+                "count": 0,
+            }
+        
+        user_id = ctx.deps.user_id
+        db = ctx.deps.db
+        
+        # Query user's leads
+        query = db.query(Lead).filter(Lead.owner_id == user_id)
+        
+        # Apply filters if provided
+        if filters:
+            if 'pipeline_status' in filters:
+                query = query.filter(Lead.pipeline_status == filters['pipeline_status'])
+            if 'lead_status' in filters:
+                query = query.filter(Lead.lead_status == filters['lead_status'])
+            if 'company' in filters:
+                query = query.filter(Lead.company.ilike(f"%{filters['company']}%"))
+        
+        leads = query.all()
+        
+        # Convert to dictionaries
+        leads_data = [
+            {
+                "id": str(lead.id),
+                "name": lead.name,
+                "company": lead.company,
+                "email": lead.email,
+                "phone_number": lead.phone_number,
+                "pipeline_status": lead.pipeline_status.value if lead.pipeline_status else None,
+                "lead_status": lead.lead_status.value if lead.lead_status else None,
+                "created_at": lead.created_at.isoformat() if lead.created_at else None,
+            }
+            for lead in leads
+        ]
+        
+        return {
+            "success": True,
+            "leads": leads_data,
+            "count": len(leads_data),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "leads": [],
+            "count": 0,
+        }
+
+
 # FastAPI Router
 ai_router = APIRouter(prefix="/ai", tags=["AI Agent"])
 
 
 @ai_router.post("/search-leads", response_model=LeadSearchResponse)
-async def search_leads(request: LeadSearchRequest):
+async def search_leads(
+    request: LeadSearchRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Search for leads using the AI agent with web search capabilities
     """
@@ -300,25 +397,41 @@ async def search_leads(request: LeadSearchRequest):
         if request.additional_criteria:
             query += f". Additional criteria: {request.additional_criteria}"
         
-        # Run the agent
+        # Run the agent with user context
         result = await agent.run(
             query,
             message_history=[],
+            deps=AgentDeps(user_id=current_user.id, db=db)
         )
         
-        # Extract leads from the result
+        # Extract leads from tool calls in the result
         leads = []
-        # The result.data contains the final response from the agent
-        response_data = getattr(result, 'data', None)
         
-        if response_data:
-            if isinstance(response_data, dict):
-                if 'results' in response_data:
-                    leads = response_data['results']
-                elif 'leads' in response_data:
-                    leads = response_data['leads']
-            elif isinstance(response_data, list):
-                leads = response_data
+        try:
+            # Get all messages from the conversation
+            messages = result.all_messages()
+            
+            # Iterate through messages to extract tool results
+            for message in messages:
+                if hasattr(message, 'parts'):
+                    for part in message.parts:
+                        part_type = type(part).__name__
+                        
+                        # Check for ToolReturnPart which contains tool results
+                        if part_type == 'ToolReturnPart':
+                            tool_content = getattr(part, 'content', None)
+                            tool_name = getattr(part, 'tool_name', '')
+                            
+                            if isinstance(tool_content, dict):
+                                # Check for leads data from search tools
+                                if 'results' in tool_content and isinstance(tool_content['results'], list):
+                                    leads.extend(tool_content['results'])
+                                elif 'leads' in tool_content and isinstance(tool_content['leads'], list):
+                                    leads.extend(tool_content['leads'])
+        except Exception as e:
+            print(f"Error extracting leads from tool calls: {e}")
+            import traceback
+            traceback.print_exc()
         
         return LeadSearchResponse(
             leads=leads,
@@ -331,7 +444,11 @@ async def search_leads(request: LeadSearchRequest):
 
 
 @ai_router.post("/process-csv", response_model=CSVProcessResponse)
-async def process_csv(request: CSVProcessRequest):
+async def process_csv(
+    request: CSVProcessRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Process CSV data to extract and filter leads
     """
@@ -348,10 +465,11 @@ async def process_csv(request: CSVProcessRequest):
             "filters": request.filters,
         }
         
-        # Run the agent
+        # Run the agent with user context
         result = await agent.run(
             query,
             message_history=[],
+            deps=AgentDeps(user_id=current_user.id, db=db)
         )
         
         # Extract leads from the result
@@ -378,7 +496,11 @@ async def process_csv(request: CSVProcessRequest):
 
 
 @ai_router.post("/query", response_model=AgentQueryResponse)
-async def query_agent(request: AgentQueryRequest):
+async def query_agent(
+    request: AgentQueryRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Send a natural language query to the AI agent.
     Intelligently returns CSV content if requested, otherwise returns chat response.
@@ -389,50 +511,82 @@ async def query_agent(request: AgentQueryRequest):
         csv_keywords = ['csv', 'export', 'download', 'spreadsheet', 'excel']
         wants_csv = any(keyword in query_lower for keyword in csv_keywords)
         
-        # Run the agent with the query
+        # Run the agent with the query and user context
         result = await agent.run(
             request.query,
             message_history=[],
+            deps=AgentDeps(user_id=current_user.id, db=db)
         )
         
-        # Extract the actual text response from the agent
-        response_text = str(getattr(result, 'data', ''))
+        # Debug: Print result structure
+        print(f"Result type: {type(result)}")
+        print(f"Result attributes: {dir(result)}")
         
-        # Check if the agent used tools and extract data
+        # Extract the actual text response from the agent
+        # In Pydantic AI, result.data contains the final output
+        # For agents without result_type, this is the string response
+        response_text = ''
         csv_content = None
         leads_data = []
         
-        # Try to extract structured data from tool calls
+        # Try to extract both text response and structured data from messages
         try:
-            if hasattr(result, 'all_messages'):
-                for message in result.all_messages():
-                    if hasattr(message, 'parts'):
-                        for part in message.parts:
-                            part_type = type(part).__name__
+            # Get all messages from the conversation
+            messages = result.all_messages()
+            
+            # Iterate through messages to extract data
+            for message in messages:
+                if hasattr(message, 'parts'):
+                    for part in message.parts:
+                        part_type = type(part).__name__
+                        
+                        # TextPart contains text content
+                        if part_type == 'TextPart':
+                            content = getattr(part, 'content', '')
+                            if content and not response_text:
+                                # Get the last non-empty text response
+                                response_text = content
+                        
+                        # Check for ToolReturnPart which contains tool results
+                        elif part_type == 'ToolReturnPart':
+                            tool_content = getattr(part, 'content', None)
+                            tool_name = getattr(part, 'tool_name', '')
                             
-                            # Check for ToolReturnPart which contains tool results
-                            if part_type == 'ToolReturnPart':
-                                tool_content = getattr(part, 'content', None)
-                                tool_name = getattr(part, 'tool_name', '')
+                            if isinstance(tool_content, dict):
+                                # Check if this is CSV creation result
+                                if tool_name == 'create_csv_from_leads' and 'csv_content' in tool_content:
+                                    csv_content = tool_content.get('csv_content')
                                 
-                                if isinstance(tool_content, dict):
-                                    # Check if this is CSV creation result
-                                    if tool_name == 'create_csv_from_leads' and 'csv_content' in tool_content:
-                                        csv_content = tool_content.get('csv_content')
-                                    
-                                    # Check for leads data from search tools
-                                    if 'results' in tool_content and isinstance(tool_content['results'], list):
-                                        leads_data.extend(tool_content['results'])
-                                    elif 'leads' in tool_content and isinstance(tool_content['leads'], list):
-                                        leads_data.extend(tool_content['leads'])
-        except Exception:
-            # If we can't extract tool data, continue with text response
-            pass
+                                # Check for leads data from search tools
+                                if 'results' in tool_content and isinstance(tool_content['results'], list):
+                                    leads_data.extend(tool_content['results'])
+                                elif 'leads' in tool_content and isinstance(tool_content['leads'], list):
+                                    leads_data.extend(tool_content['leads'])
+            
+            # The last message should be the final response - get it specifically
+            if messages:
+                last_message = messages[-1]
+                if hasattr(last_message, 'parts'):
+                    for part in last_message.parts:
+                        if type(part).__name__ == 'TextPart':
+                            content = getattr(part, 'content', '')
+                            if content:
+                                response_text = content
+                                
+        except Exception as e:
+            # If we can't extract from messages, log the error
+            print(f"Error extracting from messages: {e}")
+            import traceback
+            traceback.print_exc()
         
         # If CSV was requested but not created, try to create it from any leads data
         if wants_csv and not csv_content and leads_data:
             from src.core.utils import csv_service
             csv_content = csv_service.create_csv_content(leads_data)
+        
+        # If still no response text, provide a helpful fallback
+        if not response_text:
+            response_text = "I'm having trouble generating a response. Please try rephrasing your question."
         
         # Return appropriate response
         if csv_content:
